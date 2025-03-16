@@ -15,13 +15,6 @@ from email.message import EmailMessage
 import asyncio
 import re
 from telethon import TelegramClient
-from telethon.tl.functions.channels import InviteToChannelRequest,EditBannedRequest
-from telethon.tl.types import ChatBannedRights
-from telethon.errors import PeerFloodError, UserPrivacyRestrictedError
-from telethon.tl.functions.channels import CreateChannelRequest, DeleteChannelRequest
-from telethon.tl.functions.messages import AddChatUserRequest, DeleteChatRequest,CreateChatRequest  
-from telethon.tl.types import Chat,Channel,ChatBannedRights
-from telethon.tl.functions.messages import DeleteChatUserRequest
 from telethon import functions, types
 from telethon.tl.types import InputChannel, InputUser, ChatBannedRights,InputPeerChannel,InputPeerUser
 from speech_utils import get_command

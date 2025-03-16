@@ -2,7 +2,8 @@ import os
 from google import genai
 
 # Initialize the Gemini API client with your API key
-client = genai.Client(api_key="AIzaSyAE-_hEtucBKHS-R3SUY0NDrpTjdlMhjz0")
+client=os.environ.get("client")
+client = genai.Client(api_key=client)
 
 # Get the Desktop path
 desktop_path = os.path.join(os.path.expanduser("~"), "C:\\Users\\Vivek\\Desktop")
