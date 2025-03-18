@@ -77,7 +77,6 @@ async def get_entity(identifier):
         return None
         
 async def create_group(group_name, username=None):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -101,7 +100,6 @@ async def create_group(group_name, username=None):
         speak(f"Error creating group: {e}")
 
 async def create_channel(channel_name, username=None):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -125,7 +123,6 @@ async def create_channel(channel_name, username=None):
         speak(f"Error creating channel: {e}")
 
 async def add_user_to_group(group_identifier, user_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -145,7 +142,6 @@ async def add_user_to_group(group_identifier, user_identifier):
         speak(f"Group '{group_identifier}' not found or not a supergroup.")
 
 async def add_user_to_channel(channel_identifier, user_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -165,7 +161,6 @@ async def add_user_to_channel(channel_identifier, user_identifier):
         speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
 
 async def remove_user_from_group(group_identifier, user_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -186,7 +181,7 @@ async def remove_user_from_group(group_identifier, user_identifier):
         speak(f"Group '{group_identifier}' not found or not a supergroup.")
 
 async def remove_user_from_channel(channel_identifier, user_identifier):
-    global telegram_client
+
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -207,7 +202,7 @@ async def remove_user_from_channel(channel_identifier, user_identifier):
         speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
 
 async def list_group_members(group_identifier):
-    global telegram_client
+ 
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -228,7 +223,7 @@ async def list_group_members(group_identifier):
         speak(f"Group '{group_identifier}' not found or not a supergroup.")
 
 async def list_channel_members(channel_identifier):
-    global telegram_client
+  
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -249,7 +244,6 @@ async def list_channel_members(channel_identifier):
         speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
 
 async def list_unread_group_messages(group_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -278,7 +272,6 @@ async def list_unread_group_messages(group_identifier):
         speak(f"Group '{group_identifier}' not found or not a supergroup.")
 
 async def list_unread_channel_messages(channel_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -307,7 +300,6 @@ async def list_unread_channel_messages(channel_identifier):
         speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
 
 async def search_group(group_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -325,7 +317,6 @@ async def search_group(group_identifier):
         speak(f"Group '{group_identifier}' not found or not a supergroup.")
 
 async def search_channel(channel_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -343,7 +334,6 @@ async def search_channel(channel_identifier):
         speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
 
 async def delete_group(group_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
@@ -358,7 +348,6 @@ async def delete_group(group_identifier):
         speak(f"Group '{group_identifier}' not found or not a supergroup.")
 
 async def delete_channel(channel_identifier):
-    global telegram_client
     if telegram_client is None:
         speak("Please start the Telegram session first.")
         return
