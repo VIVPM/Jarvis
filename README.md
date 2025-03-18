@@ -88,7 +88,61 @@
         <li><code>check_unread_emails()</code> and <code>process_email_command(command)</code>: Manage email notifications and compose emails.</li>
       </ul>
     </li>
-    <li>Telegram integration with asynchronous functions for messaging, group/channel creation, and logout.</li>
+    <li>Telegram Automation:
+    <ul>
+      <li><code>send_message_to_entity(entity, message):</code>
+    Sends a message to the specified Telegram entity (user, group, or channel).
+  </li>
+  <li><code>get_entity(identifier):</code>
+    Retrieves a Telegram entity based on a given identifier (username or ID).
+  </li>
+  <li><code>create_group(group_name, username=None):</code>
+    Creates a new Telegram group with the provided name and optional username.
+  </li>
+  <li><code>create_channel(channel_name, username=None):</code>
+    Creates a new Telegram channel with the provided name and optional username.
+  </li>
+  <li><code>add_user_to_group(group_identifier, user_identifier):</code>
+    Adds the specified user to the given Telegram group.
+  </li>
+  <li><code>add_user_to_channel(channel_identifier, user_identifier):</code>
+    Adds the specified user to the given Telegram channel.
+  </li>
+  <li><code>remove_user_from_group(group_identifier, user_identifier):</code>
+    Removes the specified user from the given Telegram group.
+  </li>
+  <li><code>remove_user_from_channel(channel_identifier, user_identifier):</code>
+    Removes the specified user from the given Telegram channel.
+  </li>
+  <li><code>list_group_members(group_identifier):</code>
+    Lists all members of the specified Telegram group.
+  </li>
+  <li><code>list_channel_members(channel_identifier):</code>
+    Lists all members of the specified Telegram channel.
+  </li>
+  <li><code>list_unread_group_messages(group_identifier):</code>
+    Retrieves unread messages from the specified Telegram group.
+  </li>
+  <li><code>list_unread_channel_messages(channel_identifier):</code>
+    Retrieves unread messages from the specified Telegram channel.
+  </li>
+  <li><code>search_group(group_identifier):</code>
+    Searches for a Telegram group by its identifier and displays details such as title, username, and participant count.
+  </li>
+  <li><code>search_channel(channel_identifier):</code>
+    Searches for a Telegram channel by its identifier and displays details such as title, username, and participant count.
+  </li>
+  <li><code>delete_group(group_identifier):</code>
+    Deletes the specified Telegram group.
+  </li>
+  <li><code>delete_channel(channel_identifier):</code>
+    Deletes the specified Telegram channel.
+  </li>
+  <li><code>logout_telegram():</code>
+    Logs out of the current Telegram session.
+  </li>
+    </ul>
+    </li>
     <li>Additional commands for file deletion, clearing file contents, and zipping files/folders.</li>
   </ul>
 
