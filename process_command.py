@@ -14,9 +14,11 @@ import time
 from email.message import EmailMessage
 import asyncio
 import re
-from telethon import TelegramClient
-from telethon import functions, types
-from telethon.tl.types import InputChannel, InputUser, ChatBannedRights,InputPeerChannel,InputPeerUser
+from telethon import TelegramClient,errors
+from telethon import functions
+from telethon.tl.functions.channels import CreateChannelRequest, InviteToChannelRequest, EditBannedRequest, DeleteChannelRequest, UpdateUsernameRequest
+from telethon.tl.functions.contacts import ResolveUsernameRequest
+from telethon.tl.types import ChatBannedRights, Message, PeerChannel
 from speech_utils import get_command
 from dotenv import load_dotenv
 load_dotenv()
@@ -56,37 +58,320 @@ async def send_message_to_entity(entity, message):
         speak(f"Message sent to {entity}")
     except Exception as e:
         speak(f"Error: {e}")
-
         
-async def create_group(group_name):
-    try:
-        me = await telegram_client.get_me()
-        input_me = InputPeerUser(me.id, me.access_hash)
-        result = await telegram_client(functions.messages.CreateChatRequest(
-            users=[input_me],
-            title=group_name
-        ))
-        # chat = result.chats[0]  # The Chat object
-        speak(f"Group '{group_name}' created successfully.")
-        # return chat  # Return the entity
-    except Exception as e:
-        speak(f"Failed to create group: {e}")
+async def get_entity(identifier):
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
         return None
+    try:
+        if identifier.isdigit():
+            entity = await telegram_client.get_entity(PeerChannel(int(identifier)))
+        else:
+            entity = await telegram_client.get_entity(identifier)
+        return entity
+    except ValueError:
+        speak(f"Entity '{identifier}' not found.")
+        return None
+    except Exception as e:
+        speak(f"Error getting entity: {e}")
+        return None
+        
+async def create_group(group_name, username=None):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    try:
+        result = await telegram_client(functions.channels.CreateChannelRequest(
+            title=group_name,
+            about="Group created via API",
+            megagroup=True
+        ))
+        group = result.chats[0]
+        speak(f"Group '{group_name}' created successfully with ID: {group.id}")
+        if username:
+            try:
+                await telegram_client(functions.channels.UpdateUsernameRequest(group, username))
+                speak(f"Username set to @{username}")
+            except errors.UsernameOccupiedError:
+                speak(f"Username '@{username}' is already taken.")
+            except Exception as e:
+                speak(f"Error setting username: {e}")
+    except Exception as e:
+        speak(f"Error creating group: {e}")
 
-async def create_channel(channel_name):
+async def create_channel(channel_name, username=None):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
     try:
         result = await telegram_client(functions.channels.CreateChannelRequest(
             title=channel_name,
-            about="Created by assistant",
+            about="Channel created via API",
             megagroup=False
         ))
-        channel = result.chats[0]  # The Channel object
-        speak(f"Channel '{channel_name}' created successfully. ID '{channel.id}'")
-        return channel  # Return the entity
+        channel = result.chats[0]
+        speak(f"Channel '{channel_name}' created successfully with ID: {channel.id}")
+        if username:
+            try:
+                await telegram_client(functions.channels.UpdateUsernameRequest(channel, username))
+                speak(f"Username set to @{username}")
+            except errors.UsernameOccupiedError:
+                speak(f"Username '@{username}' is already taken.")
+            except Exception as e:
+                speak(f"Error setting username: {e}")
     except Exception as e:
-        speak(f"Failed to create channel: {e}")
-        return None
-        
+        speak(f"Error creating channel: {e}")
+
+async def add_user_to_group(group_identifier, user_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    group = await get_entity(group_identifier)
+    if group and hasattr(group, 'megagroup') and group.megagroup:
+        try:
+            user = await telegram_client(ResolveUsernameRequest(user_identifier))
+            if user.users:
+                user = user.users[0]
+                await telegram_client(InviteToChannelRequest(channel=group, users=[user.id]))
+                speak(f"User '{user_identifier}' added to group '{group.title}'.")
+            else:
+                speak(f"User '{user_identifier}' not found.")
+        except Exception as e:
+            speak(f"Error adding user: {e}")
+    else:
+        speak(f"Group '{group_identifier}' not found or not a supergroup.")
+
+async def add_user_to_channel(channel_identifier, user_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    channel = await get_entity(channel_identifier)
+    if channel and hasattr(channel, 'megagroup') and not channel.megagroup:
+        try:
+            user = await telegram_client(ResolveUsernameRequest(user_identifier))
+            if user.users:
+                user = user.users[0]
+                await telegram_client(InviteToChannelRequest(channel=channel, users=[user.id]))
+                speak(f"User '{user_identifier}' added to channel '{channel.title}'.")
+            else:
+                speak(f"User '{user_identifier}' not found.")
+        except Exception as e:
+            speak(f"Error adding user: {e}")
+    else:
+        speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
+
+async def remove_user_from_group(group_identifier, user_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    group = await get_entity(group_identifier)
+    if group and hasattr(group, 'megagroup') and group.megagroup:
+        try:
+            user = await telegram_client(ResolveUsernameRequest(user_identifier))
+            if user.users:
+                user = user.users[0]
+                banned_rights = ChatBannedRights(until_date=None, view_messages=True)
+                await telegram_client(EditBannedRequest(group, user, banned_rights))
+                speak(f"User '{user_identifier}' removed from group '{group.title}'.")
+            else:
+                speak(f"User '{user_identifier}' not found.")
+        except Exception as e:
+            speak(f"Error removing user: {e}")
+    else:
+        speak(f"Group '{group_identifier}' not found or not a supergroup.")
+
+async def remove_user_from_channel(channel_identifier, user_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    channel = await get_entity(channel_identifier)
+    if channel and hasattr(channel, 'megagroup') and not channel.megagroup:
+        try:
+            user = await telegram_client(ResolveUsernameRequest(user_identifier))
+            if user.users:
+                user = user.users[0]
+                banned_rights = ChatBannedRights(until_date=None, view_messages=True)
+                await telegram_client(EditBannedRequest(channel, user, banned_rights))
+                speak(f"User '{user_identifier}' removed from channel '{channel.title}'.")
+            else:
+                speak(f"User '{user_identifier}' not found.")
+        except Exception as e:
+            speak(f"Error removing user: {e}")
+    else:
+        speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
+
+async def list_group_members(group_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    group = await get_entity(group_identifier)
+    if group and hasattr(group, 'megagroup') and group.megagroup:
+        try:
+            participants = await telegram_client.get_participants(group)
+            if participants:
+                speak(f"Group members of '{group.title}' (Total: {len(participants)}):")
+                for participant in participants:
+                    username = participant.username or "No username"
+                    speak(f"- {participant.first_name} (@{username})")
+            else:
+                speak("No members in the group.")
+        except Exception as e:
+            speak(f"Error listing group members: {e}")
+    else:
+        speak(f"Group '{group_identifier}' not found or not a supergroup.")
+
+async def list_channel_members(channel_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    channel = await get_entity(channel_identifier)
+    if channel and hasattr(channel, 'megagroup') and not channel.megagroup:
+        try:
+            participants = await telegram_client.get_participants(channel)
+            if participants:
+                speak(f"Channel members of '{channel.title}' (Total: {len(participants)}):")
+                for participant in participants:
+                    username = participant.username or "No username"
+                    speak(f"- {participant.first_name} (@{username})")
+            else:
+                speak("No members in the channel.")
+        except Exception as e:
+            speak(f"Error listing channel members: {e}")
+    else:
+        speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
+
+async def list_unread_group_messages(group_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    group = await get_entity(group_identifier)
+    if group and hasattr(group, 'megagroup') and group.megagroup:
+        try:
+            dialogs = await telegram_client.get_dialogs()
+            last_read_id = 0
+            for dialog in dialogs:
+                if dialog.entity.id == group.id:
+                    last_read_id = dialog.dialog.read_inbox_max_id
+                    break
+            messages = await telegram_client.get_messages(group, min_id=last_read_id, limit=100)
+            if messages:
+                speak(f"Unread messages in group '{group.title}' (Total: {len(messages)}):")
+                for msg in messages:
+                    if isinstance(msg, Message):
+                        sender = await msg.get_sender()
+                        sender_name = sender.username or sender.first_name or "Unknown" if sender else "Group"
+                        speak(f"- From @{sender_name}: {msg.text} (ID: {msg.id})")
+            else:
+                speak("No unread messages in the group.")
+        except Exception as e:
+            speak(f"Error listing unread group messages: {e}")
+    else:
+        speak(f"Group '{group_identifier}' not found or not a supergroup.")
+
+async def list_unread_channel_messages(channel_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    channel = await get_entity(channel_identifier)
+    if channel and hasattr(channel, 'megagroup') and not channel.megagroup:
+        try:
+            dialogs = await telegram_client.get_dialogs()
+            last_read_id = 0
+            for dialog in dialogs:
+                if dialog.entity.id == channel.id:
+                    last_read_id = dialog.dialog.read_inbox_max_id
+                    break
+            messages = await telegram_client.get_messages(channel, min_id=last_read_id, limit=100)
+            if messages:
+                speak(f"Unread messages in channel '{channel.title}' (Total: {len(messages)}):")
+                for msg in messages:
+                    if isinstance(msg, Message):
+                        sender = await msg.get_sender()
+                        sender_name = sender.username or sender.first_name or "Unknown" if sender else "Channel"
+                        speak(f"- From @{sender_name}: {msg.text} (ID: {msg.id})")
+            else:
+                speak("No unread messages in the channel.")
+        except Exception as e:
+            speak(f"Error listing unread channel messages: {e}")
+    else:
+        speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
+
+async def search_group(group_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    entity = await get_entity(group_identifier)
+    if entity and hasattr(entity, 'megagroup') and entity.megagroup:
+        try:
+            participants = await telegram_client.get_participants(entity)
+            participant_count = len(participants)
+            speak(f"Group found: {entity.title} (@{entity.username or 'No username'})")
+            speak(f"ID: {entity.id}")
+            speak(f"Participants: {participant_count}")
+        except Exception as e:
+            speak(f"Error searching group: {e}")
+    else:
+        speak(f"Group '{group_identifier}' not found or not a supergroup.")
+
+async def search_channel(channel_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    entity = await get_entity(channel_identifier)
+    if entity and hasattr(entity, 'megagroup') and not entity.megagroup:
+        try:
+            participants = await telegram_client.get_participants(entity)
+            participant_count = len(participants)
+            speak(f"Channel found: {entity.title} (@{entity.username or 'No username'})")
+            speak(f"ID: {entity.id}")
+            speak(f"Participants: {participant_count}")
+        except Exception as e:
+            speak(f"Error searching channel: {e}")
+    else:
+        speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
+
+async def delete_group(group_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    group = await get_entity(group_identifier)
+    if group and hasattr(group, 'megagroup') and group.megagroup:
+        try:
+            await telegram_client(DeleteChannelRequest(group))
+            speak(f"Group '{group.title}' deleted successfully.")
+        except Exception as e:
+            speak(f"Error deleting group: {e}")
+    else:
+        speak(f"Group '{group_identifier}' not found or not a supergroup.")
+
+async def delete_channel(channel_identifier):
+    global telegram_client
+    if telegram_client is None:
+        speak("Please start the Telegram session first.")
+        return
+    channel = await get_entity(channel_identifier)
+    if channel and hasattr(channel, 'megagroup') and not channel.megagroup:
+        try:
+            await telegram_client(DeleteChannelRequest(channel))
+            speak(f"Channel '{channel.title}' deleted successfully.")
+        except Exception as e:
+            speak(f"Error deleting channel: {e}")
+    else:
+        speak(f"Channel '{channel_identifier}' not found or not a broadcast channel.")
+
 def prompt_save_summary(summary):
     """
     Asks the user if they want to save the summary.
@@ -538,21 +823,20 @@ def process_email_command(command):
 async def logout_telegram():
     try:
         await telegram_client.log_out()
-        await telegram_client.disconnect()
+        # await telegram_client.disconnect()
         speak("Logged out of Telegram successfully.")
     except Exception as e:
         speak(f"Error logging out of Telegram: {e}")
 
 def process_command(command):
     # Check if the user wants to stop any ongoing speech
+    global telegram_client
     if command.strip() == "stop":
         stop_speech()
         speak("Okay, I've stopped speaking. How can I assist you next?")
         return
     
-    global telegram_client
-    
-    if command == "start telegram":
+    elif command == "start telegram":
         if telegram_client is None:
             phone = input("Please enter your phone number: ")
             telegram_client = TelegramClient('telegram_session', api_id, api_hash)
@@ -563,22 +847,6 @@ def process_command(command):
                 speak(f"Failed to start Telegram session: {e}")
         else:
             speak("Telegram session is already started.")
-    
-    elif "create group" in command:
-        match = re.search(r"create group (.+)", command)
-        if match:
-            group_name = match.group(1).strip()
-            asyncio.get_event_loop().run_until_complete(create_group(group_name))
-        else:
-            speak("Please specify the group name.")
-            
-    elif "create channel" in command:
-        match = re.search(r"create channel (.+)", command)
-        if match:
-            channel_name = match.group(1).strip()
-            asyncio.get_event_loop().run_until_complete(create_channel(channel_name))
-        else:
-            speak("Please specify the channel name.")
     
     # Example condition for adding a user to a group:
             
@@ -591,6 +859,140 @@ def process_command(command):
             asyncio.get_event_loop().run_until_complete(send_message_to_entity(entity, message))
         else:
             speak("I didn't understand the send message command. Please say 'send message to [recipient] [message]'.")
+            
+    # elif "create group" in command:
+    #     match = re.search(r"create group (.+)", command)
+    #     if match:
+    #         group_name = match.group(1).strip()
+    #         asyncio.get_event_loop().run_until_complete(create_group(group_name))
+    #     else:
+    #         speak("Please specify the group name, e.g., 'create group MyGroup'")
+
+    # elif "create channel" in command:
+    #     match = re.search(r"create channel (.+)", command)
+    #     if match:
+    #         channel_name = match.group(1).strip()
+    #         asyncio.get_event_loop().run_until_complete(create_channel(channel_name))
+    #     else:
+    #         speak("Please specify the channel name, e.g., 'create channel MyChannel'")
+
+    elif "create group" in command and "with username" in command:
+        match = re.search(r"create group (.+) with username (\S+)", command)
+        if match:
+            group_name = match.group(1).strip()
+            username = match.group(2).strip()
+            asyncio.get_event_loop().run_until_complete(create_group(group_name, username))
+        else:
+            speak("Please specify the group name and username correctly, e.g., 'create group MyGroup with username @MyUsername'.")
+
+    elif "create channel" in command and "with username" in command:
+        match = re.search(r"create channel (.+) with username (\S+)", command)
+        if match:
+            channel_name = match.group(1).strip()
+            username = match.group(2).strip()
+            asyncio.get_event_loop().run_until_complete(create_channel(channel_name, username))
+        else:
+            speak("Please specify the channel name and username correctly, e.g., 'create channel MyChannel with username @MyChannelUsername'.")
+
+    elif "add user" in command and "to group" in command:
+        match = re.search(r"add user (.+) to group (.+)", command)
+        if match:
+            user_identifier = match.group(1).strip()
+            group_identifier = match.group(2).strip()
+            asyncio.get_event_loop().run_until_complete(add_user_to_group(group_identifier, user_identifier))
+        else:
+            speak("Please specify the user and group identifiers, e.g., 'add user @username to group @groupname'.")
+
+    elif "add user" in command and "to channel" in command:
+        match = re.search(r"add user (.+) to channel (.+)", command)
+        if match:
+            user_identifier = match.group(1).strip()
+            channel_identifier = match.group(2).strip()
+            asyncio.get_event_loop().run_until_complete(add_user_to_channel(channel_identifier, user_identifier))
+        else:
+            speak("Please specify the user and channel identifiers, e.g., 'add user @username to channel @channelname'.")
+
+    elif "remove user" in command and "from group" in command:
+        match = re.search(r"remove user (.+) from group (.+)", command)
+        if match:
+            user_identifier = match.group(1).strip()
+            group_identifier = match.group(2).strip()
+            asyncio.get_event_loop().run_until_complete(remove_user_from_group(group_identifier, user_identifier))
+        else:
+            speak("Please specify the user and group identifiers, e.g., 'remove user @username from group @groupname'.")
+
+    elif "remove user" in command and "from channel" in command:
+        match = re.search(r"remove user (.+) from channel (.+)", command)
+        if match:
+            user_identifier = match.group(1).strip()
+            channel_identifier = match.group(2).strip()
+            asyncio.get_event_loop().run_until_complete(remove_user_from_channel(channel_identifier, user_identifier))
+        else:
+            speak("Please specify the user and channel identifiers, e.g., 'remove user @username from channel @channelname'.")
+
+    elif "list members of group" in command:
+        match = re.search(r"list members of group (.+)", command)
+        if match:
+            group_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(list_group_members(group_identifier))
+        else:
+            speak("Please specify the group identifier, e.g., 'list members of group @groupname'.")
+
+    elif "list members of channel" in command:
+        match = re.search(r"list members of channel (.+)", command)
+        if match:
+            channel_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(list_channel_members(channel_identifier))
+        else:
+            speak("Please specify the channel identifier, e.g., 'list members of channel @channelname'.")
+
+    elif "list unread messages in group" in command:
+        match = re.search(r"list unread messages in group (.+)", command)
+        if match:
+            group_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(list_unread_group_messages(group_identifier))
+        else:
+            speak("Please specify the group identifier, e.g., 'list unread messages in group @groupname'.")
+
+    elif "list unread messages in channel" in command:
+        match = re.search(r"list unread messages in channel (.+)", command)
+        if match:
+            channel_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(list_unread_channel_messages(channel_identifier))
+        else:
+            speak("Please specify the channel identifier, e.g., 'list unread messages in channel @channelname'.")
+
+    elif "search group" in command:
+        match = re.search(r"search group (.+)", command)
+        if match:
+            group_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(search_group(group_identifier))
+        else:
+            speak("Please specify the group identifier, e.g., 'search group @groupname'.")
+
+    elif "search channel" in command:
+        match = re.search(r"search channel (.+)", command)
+        if match:
+            channel_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(search_channel(channel_identifier))
+        else:
+            speak("Please specify the channel identifier, e.g., 'search channel @channelname'.")
+
+    elif "delete group" in command:
+        match = re.search(r"delete group (.+)", command)
+        if match:
+            group_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(delete_group(group_identifier))
+        else:
+            speak("Please specify the group identifier, e.g., 'delete group @groupname'.")
+
+    elif "delete channel" in command:
+        match = re.search(r"delete channel (.+)", command)
+        if match:
+            channel_identifier = match.group(1).strip()
+            asyncio.get_event_loop().run_until_complete(delete_channel(channel_identifier))
+        else:
+            speak("Please specify the channel identifier, e.g., 'delete channel @channelname'.")
 
             
     elif "logout telegram" in command:
